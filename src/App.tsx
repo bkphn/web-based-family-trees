@@ -7,12 +7,17 @@ export default function App() {
   const [status, setStatus] = useState<string>('Trwa uruchamianiae silnika SQLite...');
 
   useEffect(() => {
+    let isMounted = true;
+
     const init = async() => {
       try {
         const db = await getDataBase();
-        console.log('Obiekt bazy:', db);
+
+        if (!isMounted) return;
+        console.log("Baza danych: ",db)
         setStatus("Baza uruchomiła się prawidłowo");
       } catch (error: unknown) {
+        if (!isMounted) return
         const message = error instanceof Error? error.message: 'Nieznany błąd';
         setStatus(`Błąd uruchamiania bazy: ${message}`);
       }
@@ -20,7 +25,9 @@ export default function App() {
       
     }
     init();
-
+    return () => {
+      isMounted = false;
+    }
   },[])
 
   return (
