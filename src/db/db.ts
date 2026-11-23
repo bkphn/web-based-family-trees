@@ -1,6 +1,7 @@
 import initSqlJs, { type Database } from 'sql.js';
 import { SCHEMA } from './schema';
 
+let initPromise: Promise<Database> | null = null;
 let dbInstance: Database | null = null;
 
 const IDB_NAME = 'family_tree';
@@ -37,24 +38,36 @@ async function saveToIdb(data: Uint8Array): Promise<void> {
 
 export async function getDataBase(): Promise<Database> {
     if (dbInstance) return dbInstance;
+    if (initPromise) return initPromise;
+    initPromise = (async () => {
+        try {
+            const SQL = await initSqlJs({
+                locateFile: () => `${import.meta.env.BASE_URL}sql-wasm.wasm`,
+            });
 
-    const SQL = await initSqlJs({
-        locateFile: () => `${import.meta.env.BASE_URL}sql-wasm.wasm`,
-    });
+            const saved = await loadFromIdb();
+            dbInstance = saved ? new SQL.Database(saved) : new SQL.Database();
 
-    const saved = await loadFromIdb();
-    dbInstance = saved ? new SQL.Database(saved) : new SQL.Database();
+            dbInstance.run('PRAGMA foreign_keys = ON;');
+            dbInstance.run(SCHEMA); // idempotentne (IF NOT EXISTS), więc bezpieczne przy każdym starcie
+            await saveDatabase();
 
-    dbInstance.run('PRAGMA foreign_keys = ON;');
-    dbInstance.run(SCHEMA); // idempotentne (IF NOT EXISTS), więc bezpieczne przy każdym starcie
-    await saveDatabase();
+            return dbInstance
+        } finally {
+            initPromise=null
+        }
+    })()
 
-    return dbInstance;
+    return await initPromise;
 }
-
+let saveQueue: Promise<void> = Promise.resolve();
 export async function saveDatabase(): Promise<void> {
     if (!dbInstance) return;
-    const data = dbInstance.export();
-    dbInstance.run('PRAGMA foreign_keys = ON;');
-    await saveToIdb(data);
+    const performSave = async() => {
+        if (!dbInstance) return;
+        const data = dbInstance.export();
+        await saveToIdb(data);
+    }
+    saveQueue = saveQueue.catch(() => {}).then(performSave)
+    return await saveQueue
 }
