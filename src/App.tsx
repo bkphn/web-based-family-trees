@@ -1,3 +1,6 @@
+import AppLayout from './app/AppLayout'
+import GraphViewport from './graph/components/GraphViewport'
+
 import { useEffect, useState } from 'react'
 import { getDataBase } from './db/db'
 import './App.css'
@@ -46,7 +49,13 @@ export default function App() {
     }
   },[])
 
+  const showGraphViewport = false /* true – widok grafu | false – wasze menu */
+
   return (
+    <AppLayout>
+          {showGraphViewport ? (
+        <GraphViewport />
+      ) : (
     <div style={{ padding: '2rem', fontFamily: 'sans-serif' }}>
       <h1>Multimedialne Drzewa Genealogiczne</h1>
       <p>Status bazy danych:</p>
@@ -101,6 +110,8 @@ export default function App() {
       )}
 
     </div>
+      )}
+    </AppLayout>
   );
 }
 
